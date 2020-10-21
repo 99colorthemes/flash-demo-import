@@ -5,9 +5,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Class to import demo attachments
  *
- * Class Nnc_Attachment_Importers
+ * Class Fdi_Attachment_Importers
  */
-class Nnc_Attachment_Importers {
+class Fdi_Attachment_Importers {
 
     private $map_attachment_old_and_new_ids = [];
 
@@ -18,21 +18,29 @@ class Nnc_Attachment_Importers {
      * @return int|WP_Error
      */
     public function import($theme_demo_id) {
-        //api calls
-        $nnc_demo_import_api_calls = new Nnc_Demo_Import_Api_Calls(
-            nnc_get_import_attachments_url($theme_demo_id)
+
+        $url_param = '';
+
+        if(isset($_POST['page']) && isset($_POST['limit'])) {
+            $page = intval($_POST['page']);
+            $limit = intval($_POST['limit']);
+
+            $url_param = '?page='.$page.'&limit='.$limit;
+        }
+
+        $flash_demo_import_api_calls = new Flash_Demo_Import_Api_Calls(
+            fdi_get_import_attachments_url($theme_demo_id, $url_param)
         );
 
         //api call fail
-        if($nnc_demo_import_api_calls->has_error()) {
-            return $nnc_demo_import_api_calls->get_error();
+        if($flash_demo_import_api_calls->has_error()) {
+            return $flash_demo_import_api_calls->get_error();
         }
 
         //api call success
-        if ($nnc_demo_import_api_calls->is_success()) {
+        if ($flash_demo_import_api_calls->is_success()) {
 
-            $attachments = $nnc_demo_import_api_calls->fetch_data();
-
+            $attachments = $flash_demo_import_api_calls->fetch_data();
             if (isset($attachments['data'])) {
 
                 foreach ($attachments['data'] as $attachment) {
@@ -67,7 +75,7 @@ class Nnc_Attachment_Importers {
                        continue;
                     }
 
-                    $post['post_title'] = $content['post_title'];
+                    $post['post_title'] = sanitize_text_field($content['post_title']);
                     $post['post_mime_type'] = $info['type'];
 
                     $post_id = wp_insert_attachment( $post, $upload['file'] );
@@ -128,7 +136,7 @@ class Nnc_Attachment_Importers {
 
         if ( $code !== 200 ) {
             unlink( $upload['file'] );
-            return new WP_Error('import_failed', __( 'Failed to import.', 'nnc-demo-importer' ));
+            return new WP_Error('import_failed', __( 'Failed to import.', 'flash-demo-import' ));
         }
 
         return $upload;

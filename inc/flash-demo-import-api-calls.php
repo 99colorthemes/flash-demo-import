@@ -2,9 +2,9 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Class Nnc_Demo_Import_Api_Calls
+ * Class Flash_Demo_Import_Api_Calls
  */
-class Nnc_Demo_Import_Api_Calls {
+class Flash_Demo_Import_Api_Calls {
 
     private $is_error = false;
 
@@ -78,12 +78,12 @@ class Nnc_Demo_Import_Api_Calls {
         if($this->response_code === 403) {
             return new WP_Error(
                 'forbidden_api_call',
-                __( 'Please buy a premium theme and add license key to import the premium demo.', 'nnc-demo-import' )
+                __( 'Please buy a premium theme and add license key to import the premium demo.', 'flash-demo-import' )
             );
         }
         return new WP_Error(
             'import_failed',
-            __( 'Failed to import.', 'nnc-demo-import' )
+            __( 'Failed to import.', 'flash-demo-import' )
         );
     }
 

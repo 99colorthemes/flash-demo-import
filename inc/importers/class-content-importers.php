@@ -5,9 +5,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Class to import post, page demo data.
  *
- * Class Nnc_Content_Importers
+ * Class Fdi_Content_Importers
  */
-class Nnc_Content_Importers {
+class Fdi_Content_Importers {
 
     private $map_content_old_and_new_ids = [];
     private $map_taxonomy_old_and_new_ids = [];
@@ -21,18 +21,18 @@ class Nnc_Content_Importers {
      */
     public function import($theme_demo_id)
     {
-        $nnc_demo_import_api_calls = new Nnc_Demo_Import_Api_Calls(
-            nnc_get_import_contents_url($theme_demo_id)
+        $flash_demo_import_api_calls = new Flash_Demo_Import_Api_Calls(
+            fdi_get_import_contents_url($theme_demo_id)
         );
 
         //api call fail
-        if($nnc_demo_import_api_calls->has_error()) {
-            return $nnc_demo_import_api_calls->get_error();
+        if($flash_demo_import_api_calls->has_error()) {
+            return $flash_demo_import_api_calls->get_error();
         }
 
-        if ($nnc_demo_import_api_calls->is_success()) {
+        if ($flash_demo_import_api_calls->is_success()) {
 
-            $contents = $nnc_demo_import_api_calls->fetch_data();
+            $contents = $flash_demo_import_api_calls->fetch_data();
 
             if (isset($contents['data'])) {
 
@@ -67,7 +67,7 @@ class Nnc_Content_Importers {
      */
     public function save_content($posts, $post_type, $theme_demo_id) {
 
-        $nnc_demo_feature_images = get_transient( 'nnc_demo_importer_map_featured_images_'.$theme_demo_id);
+        $flash_demo_import_feature_images = get_transient( 'flash_demo_import_map_featured_images_'.$theme_demo_id);
 
         foreach ($posts as $post) {
             $content = json_decode($post['content'], true);
@@ -134,9 +134,9 @@ class Nnc_Content_Importers {
             if(isset($content['meta']['_thumbnail_id'])) {
                 $old_thumbnail_id = $content['meta']['_thumbnail_id'];
 
-                if(isset($nnc_demo_feature_images[$old_thumbnail_id])  &&
-                    $nnc_demo_feature_images[$old_thumbnail_id] != $old_thumbnail_id) {
-                    update_post_meta( $content_id, '_thumbnail_id', $nnc_demo_feature_images[$old_thumbnail_id]  );
+                if(isset($flash_demo_import_feature_images[$old_thumbnail_id])  &&
+                    $flash_demo_import_feature_images[$old_thumbnail_id] != $old_thumbnail_id) {
+                    update_post_meta( $content_id, '_thumbnail_id', intval($flash_demo_import_feature_images[$old_thumbnail_id]));
                 }
             }
 
@@ -144,9 +144,9 @@ class Nnc_Content_Importers {
                 $this->update_post_menu_item_object_id($content_id, $content);
             }
 
-            $this->map_content_old_and_new_ids[$original_id] = $content_id;
+            $this->map_content_old_and_new_ids[$original_id] = intval($content_id);
 
-            do_action( 'wp_import_insert_post', $content_id, $original_id, $contentdata, $content );
+            do_action( 'wp_import_insert_post', intval($content_id), intval($original_id), $contentdata, $content );
 
         }
     }
@@ -192,10 +192,10 @@ class Nnc_Content_Importers {
         $menu_id = '';
         if(isset($content['terms']['nav_menu'][0]['name'])) {
             $nav_menu = $content['terms']['nav_menu'][0];
-            $menu = wp_get_nav_menu_object($nav_menu['name']);
+            $menu = wp_get_nav_menu_object(sanitize_text_field($nav_menu['name']));
             if( !$menu ) {
-                $menu_id = wp_create_nav_menu($nav_menu['name']);
-                $this->all_created_menus[] = $nav_menu['slug'];
+                $menu_id = wp_create_nav_menu(sanitize_text_field($nav_menu['name']));
+                $this->all_created_menus[] = sanitize_title($nav_menu['slug']);
 
             } else {
                 $menu_id = $menu->term_id;
@@ -203,7 +203,7 @@ class Nnc_Content_Importers {
         }
 
         if($menu_id) {
-            wp_set_object_terms( $post_id, array( $menu_id ), 'nav_menu' );
+            wp_set_object_terms( $post_id, array( intval($menu_id) ), 'nav_menu' );
         }
     }
 
@@ -251,7 +251,7 @@ class Nnc_Content_Importers {
                             $term_id = is_array( $term_exists ) ? $term_exists['term_id'] : $term_exists;
 
                             if ( ! $term_id ) {
-                                $term_id_tax_id = wp_insert_term( $term['name'], $taxonomy, $term );
+                                $term_id_tax_id = wp_insert_term(sanitize_text_field($term['name']), $taxonomy, $term );
                                 if ( is_wp_error( $term_id_tax_id ) ) {
                                     continue;
                                 }
@@ -261,7 +261,7 @@ class Nnc_Content_Importers {
 
                             $taxonomies_ids[ $taxonomy ][] = intval( $term_id );
 
-                            $this->map_taxonomy_old_and_new_ids[$term['term_taxonomy_id']] = $term_id;
+                            $this->map_taxonomy_old_and_new_ids[$term['term_taxonomy_id']] = intval($term_id);
                         }
                     }
                 }
@@ -279,7 +279,7 @@ class Nnc_Content_Importers {
      */
     public function post_exists( $data ) {
 
-        $exists = post_exists( $data['post_title'], $data['post_content'], $data['post_date']);
+        $exists = post_exists(sanitize_text_field($data['post_title']), $data['post_content'], $data['post_date']);
 
         return $exists;
     }

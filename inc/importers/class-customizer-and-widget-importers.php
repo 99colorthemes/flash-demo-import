@@ -3,11 +3,11 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Class to import widgets demo data.
+ * Class to import customizer and widgets demo data.
  *
- * Class Nnc_Widget_Importers
+ * Class Fdi_Customizer_And_Widget_Importers
  */
-class Nnc_Widget_Importers {
+class Fdi_Customizer_And_Widget_Importers {
 
     /**
      * Available widgets
@@ -17,7 +17,7 @@ class Nnc_Widget_Importers {
     private $available_widgets = [];
 
     /**
-     * Nnc_Widget_Importers constructor.
+     * Fdi_Customizer_And_Widget_Importers constructor.
      */
     public function __construct()
     {
@@ -32,66 +32,124 @@ class Nnc_Widget_Importers {
      */
     public function import($theme_demo_id)
     {
-        global $wp_registered_sidebars;
-
-        $nnc_demo_import_api_calls = new Nnc_Demo_Import_Api_Calls(
-            nnc_get_import_widgets_url($theme_demo_id)
+        $flash_demo_import_api_calls = new Flash_Demo_Import_Api_Calls(
+            fdi_get_import_options_url($theme_demo_id)
         );
 
         //api call fail
-        if($nnc_demo_import_api_calls->has_error()) {
-            return $nnc_demo_import_api_calls->get_error();
+        if($flash_demo_import_api_calls->has_error()) {
+            return $flash_demo_import_api_calls->get_error();
         }
 
-        if ($nnc_demo_import_api_calls->is_success()) {
+        if ($flash_demo_import_api_calls->is_success()) {
 
-            $sidebars_with_widgets = $nnc_demo_import_api_calls->fetch_data();
+            $sidebars_with_widgets = $flash_demo_import_api_calls->fetch_data();
 
+            $this->import_widgets($sidebars_with_widgets);
 
-            if (isset($sidebars_with_widgets['data'])) {
+            $this->import_customizer($sidebars_with_widgets, $theme_demo_id);
+        }
+    }
 
-                foreach ($sidebars_with_widgets['data'] as $sidebar_id => $widget_siderbar) {
+    private function import_widgets($sidebars_with_widgets) {
+        global $wp_registered_sidebars;
 
-                    //default set widgets to inactive
-                    $use_sidebar_id = 'wp_inactive_widgets';
+        if (isset($sidebars_with_widgets['widgets'])) {
 
-                    //if the widgets has sidebar assign it.
-                    if (isset($wp_registered_sidebars[$sidebar_id])) {
-                        $use_sidebar_id = $sidebar_id;
-                    }
+            foreach ($sidebars_with_widgets['widgets'] as $sidebar_id => $widget_siderbar) {
 
-                    foreach ($widget_siderbar as $widget_id => $widget) {
+                //default set widgets to inactive
+                $use_sidebar_id = 'wp_inactive_widgets';
 
-                        $base_widget_id = preg_replace('/-[0-9]+$/', '', $widget_id);
-
-                        $is_widget_appropriate_to_save = $this->is_widget_appropriate_to_save($widget, $base_widget_id, $use_sidebar_id);
-
-                        if(!$is_widget_appropriate_to_save) {
-                            continue;
-                        }
-
-                        $single_widget_instances = get_option('widget_' . $base_widget_id);
-                        $single_widget_instances = !empty($single_widget_instances) ? $single_widget_instances : array('_multiwidget' => 1);
-                        $single_widget_instances[] = $widget; // Add it.
-
-                        end($single_widget_instances);
-                        //give you the key of last widget
-                        $new_instance_id_number = key($single_widget_instances);
-
-                        if ( '0' === strval( $new_instance_id_number ) ) {
-                            $new_instance_id_number                           = 1;
-                            $single_widget_instances[ $new_instance_id_number ] = $single_widget_instances[0];
-                            unset( $single_widget_instances[0] );
-                        }
-
-                        $this->save_widget($base_widget_id, $single_widget_instances);
-                        $this->save_widget_to_sidebar($base_widget_id, $new_instance_id_number, $use_sidebar_id);
-                    }
+                //if the widgets has sidebar assign it.
+                if (isset($wp_registered_sidebars[$sidebar_id])) {
+                    $use_sidebar_id = $sidebar_id;
                 }
+
+                foreach ($widget_siderbar as $widget_id => $widget) {
+
+                    $base_widget_id = preg_replace('/-[0-9]+$/', '', $widget_id);
+
+                    $is_widget_appropriate_to_save = $this->is_widget_appropriate_to_save($widget, $base_widget_id, $use_sidebar_id);
+
+                    if(!$is_widget_appropriate_to_save) {
+                        continue;
+                    }
+
+                    $single_widget_instances = get_option('widget_' . $base_widget_id);
+                    $single_widget_instances = !empty($single_widget_instances) ? $single_widget_instances : array('_multiwidget' => 1);
+                    $single_widget_instances[] = $widget; // Add it.
+
+                    end($single_widget_instances);
+                    //give you the key of last widget
+                    $new_instance_id_number = key($single_widget_instances);
+
+                    if ( '0' === strval( $new_instance_id_number ) ) {
+                        $new_instance_id_number                           = 1;
+                        $single_widget_instances[ $new_instance_id_number ] = $single_widget_instances[0];
+                        unset( $single_widget_instances[0] );
+                    }
+
+                    $this->save_widget($base_widget_id, $single_widget_instances);
+                    $this->save_widget_to_sidebar($base_widget_id, $new_instance_id_number, $use_sidebar_id);
+                }
+            }
+        }
+    }
+
+
+    public function import_customizer($sidebars_with_widgets, $theme_demo_id)
+    {
+        global $wp_customize;
+
+        if (isset($sidebars_with_widgets['customizer'])) {
+
+            foreach ( $sidebars_with_widgets['customizer'] as $key => $val ) {
+                if($key == 'show_on_front' || $key == 'page_on_front'){
+                    update_option($key, $this->filter_value($theme_demo_id, $key, $val) );
+                } else {
+                    do_action( 'customize_save_' . $key, $wp_customize );
+                    set_theme_mod( $key, $this->filter_value($theme_demo_id, $key, $val) );
+                }
+            }
+        }
+    }
+
+    public function filter_value($theme_demo_id, $key, $value) {
+
+        if (stripos($key, "page") !== false) {
+            $mapped_post_ids = get_transient('flash_demo_import_map_post_ids_'.$theme_demo_id);
+
+
+            return $this->get_value_by_mapped_ids($mapped_post_ids, $value);
+        }
+
+        if (stripos($key, "category") !== false) {
+            $mapped_taxanomy_ids = get_transient('flash_demo_import_map_taxonomy_ids_'.$theme_demo_id);
+
+            return $this->get_value_by_mapped_ids($mapped_taxanomy_ids, $value);
+        }
+
+        return $value;
+
+    }
+
+    public function get_value_by_mapped_ids($mapped_ids, $value) {
+
+        $old_ids = explode(',', $value);
+        $original_ids = array();
+        foreach ($old_ids as $old_id) {
+            if($mapped_ids[$old_id]) {
+                $original_ids[] = $mapped_ids[$old_id];
+            } else {
+                $original_ids[] = $old_id;
             }
 
         }
+
+        return implode(',', $original_ids);
     }
+
 
     /**
      * Get widgets with saved values.
